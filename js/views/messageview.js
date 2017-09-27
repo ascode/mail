@@ -42,11 +42,21 @@ define(function(require) {
 			this.folder = options.folder;
 			this.message = options.message;
 			this.messageBody = options.model;
+			var to = this.messageBody.get('to').filter(function(oldRecipient) {
+				// Send to everyone except yourself
+				return oldRecipient.email !== options.message.folder.account.get('emailAddress');
+			});
+			if (to.length === 0 &&
+					this.messageBody.get('to').length === 1 &&
+					this.messageBody.get('to')[0].email === options.message.folder.account.get('emailAddress')) {
+				// Super rare case: if you write an email to yourself, your email must not be removed
+				to.push(this.messageBody.get('to')[0]);
+			}
 			this.reply = {
-				replyToList: this.messageBody.get('replyToList'),
-				replyCc: this.messageBody.get('replyCc'),
-				toEmail: this.messageBody.get('toEmail'),
-				replyCcList: this.messageBody.get('replyCcList'),
+				to: to,
+				from: this.messageBody.get('to')[0],
+				fromEmail: options.message.folder.account.get('emailAddress'), // TODO: alias?
+				cc: this.messageBody.get('cc'), // Keep CC values
 				body: ''
 			};
 
@@ -57,10 +67,10 @@ define(function(require) {
 				var text = HtmlHelper.htmlToText(this.messageBody.get('body'));
 
 				this.reply.body = '\n\n\n\n' +
-					this.messageBody.get('from') + ' – ' +
-					$.datepicker.formatDate('D, d. MM yy ', date) +
-					date.getHours() + ':' + (minutes < 10 ? '0' : '') + minutes + '\n> ' +
-					text.replace(/\n/g, '\n> ');
+						this.messageBody.get('from') + ' – ' +
+						$.datepicker.formatDate('D, d. MM yy ', date) +
+						date.getHours() + ':' + (minutes < 10 ? '0' : '') + minutes + '\n> ' +
+						text.replace(/\n/g, '\n> ');
 			}
 
 			// Save current messages's content for later use (forward)
@@ -110,7 +120,7 @@ define(function(require) {
 			// Does the html mail have blocked images?
 			var hasBlockedImages = false;
 			if (this.getUI('messageIframe').contents().
-				find('[data-original-src],[data-original-style]').length) {
+					find('[data-original-src],[data-original-style]').length) {
 				hasBlockedImages = true;
 			}
 
@@ -125,7 +135,7 @@ define(function(require) {
 			var text = this.getUI('messageIframe').contents().find('body').html();
 			text = HtmlHelper.htmlToText(text);
 			var date = new Date(this.messageBody.get('dateIso'));
-			this.getChildView('replyComposer').setReplyBody(this.messageBody.get('from'), date, text);
+			this.getChildView('replyComposer').setReplyBody(this.messageBody.get('from')[0], date, text);
 
 			// Safe current mesages's content for later use (forward)
 			require('state').currentMessageBody = text;
